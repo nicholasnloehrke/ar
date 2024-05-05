@@ -110,7 +110,7 @@ void draw_frame()
 {
     for (int i = 0; i < DISPLAY_LENGTH; ++i)
     {
-        if (display_buffer_front[i] != display_buffer_back[i])
+        if (display_buffer_front[i] != display_buffer_back[i];)
         {
             display_buffer_front[i] = display_buffer_back[i];
             int row = INDEX_TO_ROW(i);
