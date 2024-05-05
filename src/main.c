@@ -4,9 +4,12 @@
 #include <termios.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdlib.h>
+#include <time.h>
+#include "ansi_codes.h"
 
-#define DISPLAY_WIDTH 50
-#define DISPLAY_HEIGHT 10
+#define DISPLAY_WIDTH 120
+#define DISPLAY_HEIGHT 70
 #define DISPLAY_LENGTH (DISPLAY_WIDTH * DISPLAY_HEIGHT)
 
 uint32_t display_buffer_back[DISPLAY_LENGTH];
@@ -17,6 +20,12 @@ uint32_t display_buffer_front[DISPLAY_LENGTH];
 #define INDEX_TO_COL(index) (((index) % DISPLAY_WIDTH) + 1)
 #define SET_PIXEL(index, mode, foreground, background, character) (display_buffer_back[(index)] = (mode) << 24 | (foreground) << 16 | (background) << 8 | (character))
 
+#define printf_at(x, y, ...) \
+    do { \
+        printf("\033[%d;%dH", INDEX_TO_ROW(POS_TO_INDEX((x), (y))), INDEX_TO_COL(POS_TO_INDEX((x), (y)))); \
+        printf(__VA_ARGS__); \
+    } while (0)
+
 void clear_display_buffer();
 void init_display();
 void draw_frame();
@@ -24,64 +33,82 @@ int kbhit();
 
 int main(int argc, char** argv)
 {
-    printf("\033[?25l");
-    printf("\033[1;1H\033[2J");
+    printf(ANSI_STR_CURSOR_INVISIBLE);
+    printf(ANSI_STR_CLEAR);
     init_display();
     
-    int x = 0;
-    int y = 0; 
+    //int x = 0;
+    //int y = 0; 
+    //while (1)
+    //{
+    //    if (kbhit())
+    //    {
+    //        char key = getchar();
+    //        switch (key)
+    //        {
+    //        case 'a':
+    //            x -= 1;
+    //            break;
+    //        case 'd':
+    //            x += 1;
+    //            break;
+    //        case 'w':
+    //            y -= 1;
+    //            break;
+    //        case 's':
+    //            y += 1;
+    //            break;
+    //        case 'q':
+    //            goto quit;
+    //        }
+    //    }
+
+    //    if (x >= DISPLAY_WIDTH - 1)
+    //    {
+    //        x = DISPLAY_WIDTH - 1;
+    //    }
+    //    else if (x < 0)
+    //    {
+    //        x = 0;
+    //    }
+    //    if (y >= DISPLAY_HEIGHT - 1)
+    //    {
+    //        y = DISPLAY_HEIGHT - 1;
+    //    }
+    //    else if (y < 0)
+    //    {
+    //        y = 0;
+    //    }
+
+    //    clear_display_buffer();
+    //    SET_PIXEL(POS_TO_INDEX(x, y), 0, 0, 0, 'X');
+
+    //    draw_frame();
+    //    fflush(stdout);
+    //    usleep(33000);
+    //}
+
+    srand(time(NULL));
+    int x, y;
     while (1)
     {
-    if (kbhit())
-        {
-            char key = getchar();
-            switch (key)
-            {
-            case 'a':
-                x -= 1;
-                break;
-            case 'd':
-                x += 1;
-                break;
-            case 'w':
-                y -= 1;
-                break;
-            case 's':
-                y += 1;
-                break;
-            case 'q':
-                goto quit;
-            }
-        }
-
-        if (x >= DISPLAY_WIDTH - 1)
-        {
-            x = DISPLAY_WIDTH - 1;
-        }
-        else if (x < 0)
-        {
-            x = 0;
-        }
-        if (y >= DISPLAY_HEIGHT - 1)
-        {
-            y = DISPLAY_HEIGHT - 1;
-        }
-        else if (y < 0)
-        {
-            y = 0;
-        }
+        x = rand() % DISPLAY_WIDTH;
+        y = rand() % DISPLAY_HEIGHT;
 
         clear_display_buffer();
-        SET_PIXEL(POS_TO_INDEX(x, y), 0, 0, 0, 'X');
+        SET_PIXEL(POS_TO_INDEX(x, y), 0, ANSI_NUM_FG_GREEN, ANSI_NUM_BG_WHITE, 'X');
 
         draw_frame();
-        fflush(stdout);
-        usleep(33000);
+        fflush(NULL);
+        usleep(1000000);
     }
+        
+    
 
     quit:
     
-    printf("\033[%d;%dH\033[?25h\n", DISPLAY_HEIGHT, DISPLAY_WIDTH);
+    printf("\033[%d;%dH", DISPLAY_HEIGHT, DISPLAY_WIDTH);
+    printf(ANSI_STR_CURSOR_VISIBLE);
                     
     return 0;
 }
@@ -109,22 +136,32 @@ void draw_frame()
 {
     for (int i = 0; i < DISPLAY_LENGTH; ++i)
     {
+        int front = display_buffer_front[i];
+        int back = display_buffer_back[i];
+        
         if (display_buffer_front[i] != display_buffer_back[i])
         {
+           
+
             display_buffer_front[i] = display_buffer_back[i];
             int row = INDEX_TO_ROW(i);
             int col = INDEX_TO_COL(i);
 
-            printf("\033[%d;%d;H", row, col);
+            printf("\033[%d;%dH", row, col);
             if (display_buffer_front[i] == 0)
             {
-                printf(" ");
+                printf("+");
+                printf_at(0, DISPLAY_HEIGHT, "DIFF | front: %u, back: %u, index: %d", front, back, i);
             }
             else
             {
                 uint32_t px = display_buffer_front[i]; 
-                printf("\033[%d;%d;%dm%c\033[0m", (px >> 24) & 0xff, (px >> 16) & 0xff, (px >> 8) & 0xff, px & 0xff);
+                printf("\033[%u;%u;%um%c\033[0m", (px >> 24) & 0xff, (px >> 16) & 0xff, (px >> 8) & 0xff, px & 0xff);
             }
+        }
+        else
+        {
+            printf_at(0, DISPLAY_HEIGHT - 1, "SAME | front: %u, back: %u, index: %d", front, back, i);
         }
     }
 }
