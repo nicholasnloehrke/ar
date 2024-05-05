@@ -1,0 +1,3 @@
+/home/dietpi/repos/ar/build/CMakeFiles/ar.dir
+/home/dietpi/repos/ar/build/CMakeFiles/edit_cache.dir
+/home/dietpi/repos/ar/build/CMakeFiles/rebuild_cache.dir
