@@ -126,6 +126,7 @@ void draw_frame()
                 printf("\033[%d;%d;%dm%c\033[0m", (px >> 24) & 0xff, (px >> 16) & 0xff, (px >> 8) & 0xff, px & 0xff);
             }
         }
+    }
 }
 
 int kbhit()
