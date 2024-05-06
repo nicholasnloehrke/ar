@@ -6,6 +6,7 @@
         "cmath": "cpp",
         "limits": "cpp",
         "new": "cpp",
-        "queue.h": "c"
+        "queue.h": "c",
+        "ansi_codes.h": "c"
     }
 }

@@ -1,6 +1,6 @@
 #include "ansi_codes.h"
+#include "ar.h"
 #include "snake.h"
-#include "types.h"
 
 #include <fcntl.h>
 #include <stdint.h>
@@ -11,24 +11,8 @@
 #include <time.h>
 #include <unistd.h>
 
-#define DISPLAY_WIDTH 40
+#define DISPLAY_WIDTH 50
 #define DISPLAY_HEIGHT 20
-#define DISPLAY_LENGTH (DISPLAY_WIDTH * DISPLAY_HEIGHT)
-
-uint32_t display_buffer_back[DISPLAY_LENGTH];
-uint32_t display_buffer_front[DISPLAY_LENGTH];
-
-#define POS_TO_INDEX(x, y) ((y) * DISPLAY_WIDTH + (x))
-#define INDEX_TO_ROW(index) (((index) / DISPLAY_WIDTH) + 1)
-#define INDEX_TO_COL(index) (((index) % DISPLAY_WIDTH) + 1)
-#define SET_PIXEL(index, mode, foreground, background, character) (display_buffer_back[(index)] = (mode) << 24 | (foreground) << 16 | (background) << 8 | (character))
-
-#define printf_at(x, y, ...)                                                                               \
-    do                                                                                                     \
-    {                                                                                                      \
-        printf("\033[%d;%dH", INDEX_TO_ROW(POS_TO_INDEX((x), (y))), INDEX_TO_COL(POS_TO_INDEX((x), (y)))); \
-        printf(__VA_ARGS__);                                                                               \
-    } while (0)
 
 typedef struct
 {
@@ -37,9 +21,6 @@ typedef struct
 
 game_t game;
 
-void clear_display_buffer();
-void init_display();
-void draw_frame();
 int kbhit();
 
 int main(int argc, char **argv)
@@ -50,9 +31,10 @@ int main(int argc, char **argv)
     new.c_lflag &= ~(ICANON | ECHO);
     tcsetattr(0, TCSANOW, &new);
 
-    printf(ANSI_STR_CURSOR_INVISIBLE);
-    printf(ANSI_STR_CLEAR);
-    init_display();
+    printf(AR_ANSI_STR_CURSOR_INVISIBLE);
+    printf(AR_ANSI_STR_CLEAR);
+
+    ar_init(DISPLAY_WIDTH, DISPLAY_HEIGHT);
 
     vec2 curr_pos;
     curr_pos.x = DISPLAY_WIDTH / 2;
@@ -70,7 +52,8 @@ int main(int argc, char **argv)
     game.prize_pos = (vec2){.x = rand() % DISPLAY_WIDTH, .y = rand() % DISPLAY_HEIGHT};
 
     struct timespec start_time, end_time;
-    while (1)
+    bool running = true;
+    while (running)
     {
         clock_gettime(CLOCK_MONOTONIC, &start_time);
         if (kbhit())
@@ -100,8 +83,14 @@ int main(int argc, char **argv)
                 break;
             case 'Q':
             case 'q':
-                goto quit;
+                running = false;
+                break;
             }
+        }
+
+        if (!running)
+        {
+            break;
         }
 
         if (frame_counter % (3 + (abs(dir.y) * 2)) == 0)
@@ -126,13 +115,13 @@ int main(int argc, char **argv)
                 curr_pos.y = DISPLAY_HEIGHT - 1;
             }
 
-            clear_display_buffer();
+            ar_clear_buffer();
             snake_move(snake, curr_pos);
-            SET_PIXEL(
-                POS_TO_INDEX(game.prize_pos.x, game.prize_pos.y),
-                ANSI_NUM_MODE_BLINKING,
-                ANSI_NUM_FG_BLACK,
-                ANSI_NUM_BG_RED,
+            ar_set_pixel(
+                ar_pos_to_index(game.prize_pos.x, game.prize_pos.y),
+                AR_ANSI_NUM_MODE_BLINKING,
+                AR_ANSI_NUM_FG_BLACK,
+                AR_ANSI_NUM_BG_RED,
                 ' ');
 
             if (snake->segments->size > 0)
@@ -144,21 +133,21 @@ int main(int argc, char **argv)
                     queue_value_t pos = curr_node->value;
                     if (first)
                     {
-                        SET_PIXEL(
-                            POS_TO_INDEX(pos.x, pos.y),
-                            ANSI_NUM_MODE_BOLD,
-                            ANSI_NUM_FG_YELLOW,
-                            ANSI_NUM_BG_WHITE,
+                        ar_set_pixel(
+                            ar_pos_to_index(pos.x, pos.y),
+                            AR_ANSI_NUM_MODE_BOLD,
+                            AR_ANSI_NUM_FG_YELLOW,
+                            AR_ANSI_NUM_BG_WHITE,
                             ' ');
                         first = false;
                     }
                     else
                     {
-                        SET_PIXEL(
-                            POS_TO_INDEX(pos.x, pos.y),
-                            ANSI_NUM_MODE_BOLD,
-                            ANSI_NUM_FG_YELLOW,
-                            ANSI_NUM_BG_CYAN,
+                        ar_set_pixel(
+                            ar_pos_to_index(pos.x, pos.y),
+                            AR_ANSI_NUM_MODE_BOLD,
+                            AR_ANSI_NUM_FG_YELLOW,
+                            AR_ANSI_NUM_BG_CYAN,
                             ' ');
                     }
                     curr_node = curr_node->next;
@@ -171,21 +160,20 @@ int main(int argc, char **argv)
                 game.prize_pos = (vec2){.x = rand() % DISPLAY_WIDTH, .y = rand() % DISPLAY_HEIGHT};
             }
 
-            printf_at(0, DISPLAY_HEIGHT + 1, "Score: %d", snake->segments->size);
+            ar_printf_at(0, DISPLAY_HEIGHT + 1, "Score: %d", snake->segments->size);
         }
 
-        draw_frame();
+        ar_draw_frame();
         fflush(stdout);
-        usleep(16666);
+        // usleep(16666);
+        usleep(10000);
 
         clock_gettime(CLOCK_MONOTONIC, &end_time);
         double delta_time = (end_time.tv_sec - start_time.tv_sec) + (end_time.tv_nsec - start_time.tv_nsec) / 1e9;
-        printf_at(0, DISPLAY_HEIGHT + 2, "fps: %f", 1 / delta_time);
+        ar_printf_at(0, DISPLAY_HEIGHT + 2, "fps: %f", 1 / delta_time);
 
         ++frame_counter;
     }
-
-quit:
 
     printf("\033[%d;%dH", DISPLAY_HEIGHT, DISPLAY_WIDTH);
     printf(ANSI_STR_CURSOR_VISIBLE);
@@ -193,56 +181,6 @@ quit:
     tcsetattr(0, TCSANOW, &old);
 
     return 0;
-}
-
-void clear_display_buffer()
-{
-    memset(display_buffer_back, 0, DISPLAY_LENGTH * 4);
-}
-
-void init_display()
-{
-    memset(display_buffer_back, 0, DISPLAY_LENGTH * 4);
-    memset(display_buffer_front, 0, DISPLAY_LENGTH * 4);
-    printf(ANSI_STR_CURSOR_HOME);
-    for (int i = 0; i < DISPLAY_LENGTH; ++i)
-    {
-        printf(" ");
-        if ((i + 1) % DISPLAY_WIDTH == 0)
-        {
-            printf("|\n");
-        }
-    }
-    for (int i = 0; i < DISPLAY_WIDTH; ++i)
-    {
-        printf("-");
-    }
-}
-
-void draw_frame()
-{
-    for (int i = 0; i < DISPLAY_LENGTH; ++i)
-    {
-        int *front = &display_buffer_front[i];
-        int *back = &display_buffer_back[i];
-
-        if (*front != *back)
-        {
-            *front = *back;
-            int row = INDEX_TO_ROW(i);
-            int col = INDEX_TO_COL(i);
-
-            printf("\033[%d;%dH", row, col);
-            if (*front == 0)
-            {
-                printf(" ");
-            }
-            else
-            {
-                printf("\033[%u;%u;%um%c\033[0m", (*front >> 24) & 0xff, (*front >> 16) & 0xff, (*front >> 8) & 0xff, *front & 0xff);
-            }
-        }
-    }
 }
 
 int kbhit()
