@@ -1,4 +1,7 @@
 #include "ansi_codes.h"
+#include "snake.h"
+#include "types.h"
+
 #include <fcntl.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -8,8 +11,8 @@
 #include <time.h>
 #include <unistd.h>
 
-#define DISPLAY_WIDTH 150
-#define DISPLAY_HEIGHT 50
+#define DISPLAY_WIDTH 40
+#define DISPLAY_HEIGHT 20
 #define DISPLAY_LENGTH (DISPLAY_WIDTH * DISPLAY_HEIGHT)
 
 uint32_t display_buffer_back[DISPLAY_LENGTH];
@@ -26,6 +29,13 @@ uint32_t display_buffer_front[DISPLAY_LENGTH];
         printf("\033[%d;%dH", INDEX_TO_ROW(POS_TO_INDEX((x), (y))), INDEX_TO_COL(POS_TO_INDEX((x), (y)))); \
         printf(__VA_ARGS__);                                                                               \
     } while (0)
+
+typedef struct
+{
+    vec2 prize_pos;
+} game_t;
+
+game_t game;
 
 void clear_display_buffer();
 void init_display();
@@ -44,109 +54,133 @@ int main(int argc, char **argv)
     printf(ANSI_STR_CLEAR);
     init_display();
 
-    int x = DISPLAY_WIDTH / 2;
-    int y = DISPLAY_HEIGHT / 2;
-    int x_dir = 0;
-    int y_dir = 0;
+    vec2 curr_pos;
+    curr_pos.x = DISPLAY_WIDTH / 2;
+    curr_pos.y = DISPLAY_HEIGHT / 2;
+    vec2 dir;
+    dir.x = 0;
+    dir.y = 0;
     unsigned long long frame_counter = 0;
+    snake_t *snake = snake_init();
+    queue_push_front(snake->segments, (vec2){.x = 0, .y = 0});
+    queue_push_front(snake->segments, (vec2){.x = 0, .y = 0});
+    queue_push_front(snake->segments, (vec2){.x = 0, .y = 0});
+    queue_push_front(snake->segments, (vec2){.x = 0, .y = 0});
+
+    game.prize_pos = (vec2){.x = rand() % DISPLAY_WIDTH, .y = rand() % DISPLAY_HEIGHT};
+
+    struct timespec start_time, end_time;
     while (1)
     {
+        clock_gettime(CLOCK_MONOTONIC, &start_time);
         if (kbhit())
         {
             char key = getchar();
             switch (key)
             {
+            case 'A':
             case 'a':
-                x_dir = -2;
-                y_dir = 0;
+                dir.x = -1;
+                dir.y = 0;
                 break;
+            case 'D':
             case 'd':
-                x_dir = 2;
-                y_dir = 0;
+                dir.x = 1;
+                dir.y = 0;
                 break;
+            case 'W':
             case 'w':
-                y_dir = -1;
-                x_dir = 0;
+                dir.y = -1;
+                dir.x = 0;
                 break;
+            case 'S':
             case 's':
-                y_dir = 1;
-                x_dir = 0;
+                dir.y = 1;
+                dir.x = 0;
                 break;
+            case 'Q':
             case 'q':
                 goto quit;
             }
         }
 
-        if (frame_counter % 2 == 0)
+        if (frame_counter % (3 + (abs(dir.y) * 2)) == 0)
         {
-            x += x_dir;
-            y += y_dir;
+            curr_pos.x += dir.x;
+            curr_pos.y += dir.y;
 
-            if (x >= DISPLAY_WIDTH - 1)
+            if (curr_pos.x >= DISPLAY_WIDTH)
             {
-                x = 0;
+                curr_pos.x = 0;
             }
-            else if (x < 0)
+            else if (curr_pos.x < 0)
             {
-                x = DISPLAY_WIDTH - 1;
+                curr_pos.x = DISPLAY_WIDTH - 1;
             }
-            if (y >= DISPLAY_HEIGHT - 1)
+            if (curr_pos.y >= DISPLAY_HEIGHT)
             {
-                y = 0;
+                curr_pos.y = 0;
             }
-            else if (y < 0)
+            else if (curr_pos.y < 0)
             {
-                y = DISPLAY_HEIGHT - 1;
+                curr_pos.y = DISPLAY_HEIGHT - 1;
             }
+
+            clear_display_buffer();
+            snake_move(snake, curr_pos);
+            SET_PIXEL(
+                POS_TO_INDEX(game.prize_pos.x, game.prize_pos.y),
+                ANSI_NUM_MODE_BLINKING,
+                ANSI_NUM_FG_BLACK,
+                ANSI_NUM_BG_RED,
+                ' ');
+
+            if (snake->segments->size > 0)
+            {
+                bool first = true;
+                queue_node_t *curr_node = snake->segments->head;
+                while (curr_node != NULL)
+                {
+                    queue_value_t pos = curr_node->value;
+                    if (first)
+                    {
+                        SET_PIXEL(
+                            POS_TO_INDEX(pos.x, pos.y),
+                            ANSI_NUM_MODE_BOLD,
+                            ANSI_NUM_FG_YELLOW,
+                            ANSI_NUM_BG_WHITE,
+                            ' ');
+                        first = false;
+                    }
+                    else
+                    {
+                        SET_PIXEL(
+                            POS_TO_INDEX(pos.x, pos.y),
+                            ANSI_NUM_MODE_BOLD,
+                            ANSI_NUM_FG_YELLOW,
+                            ANSI_NUM_BG_CYAN,
+                            ' ');
+                    }
+                    curr_node = curr_node->next;
+                }
+            }
+
+            if (VEC2_EQ(curr_pos, game.prize_pos))
+            {
+                snake_grow(snake, game.prize_pos);
+                game.prize_pos = (vec2){.x = rand() % DISPLAY_WIDTH, .y = rand() % DISPLAY_HEIGHT};
+            }
+
+            printf_at(0, DISPLAY_HEIGHT + 1, "Score: %d", snake->segments->size);
         }
-
-        clear_display_buffer();
-        SET_PIXEL(POS_TO_INDEX(x, y), 0, 0, 0, 'X');
-
-        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, '.');
-        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, 'x');
-        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, '.');
-        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, 'x');
-        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, '.');
-        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, 'x');
-        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, '.');
-        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, 'x');
-        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, '.');
-        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, 'x');
-        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, '.');
-        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, 'x');
-        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, '.');
-        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, 'x');
-        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, '.');
-        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, 'x');
-        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, '.');
-        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, 'x');
-        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, '.');
-        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, 'x');
-        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, '.');
-        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, 'x');
-        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, '.');
-        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, 'x');
-        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, '.');
-        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, 'x');
-        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, '.');
-        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, 'x');
-        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, '.');
-        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, 'x');
-        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, '.');
-        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, 'x');
-        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, '.');
-        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, 'x');
-        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, '.');
-        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, 'x');
-        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, '.');
-        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, 'x');
-        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, '.');
-        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, 'x');
 
         draw_frame();
         fflush(stdout);
-        usleep(33000);
+        usleep(16666);
+
+        clock_gettime(CLOCK_MONOTONIC, &end_time);
+        double delta_time = (end_time.tv_sec - start_time.tv_sec) + (end_time.tv_nsec - start_time.tv_nsec) / 1e9;
+        printf_at(0, DISPLAY_HEIGHT + 2, "fps: %f", 1 / delta_time);
 
         ++frame_counter;
     }
@@ -170,13 +204,18 @@ void init_display()
 {
     memset(display_buffer_back, 0, DISPLAY_LENGTH * 4);
     memset(display_buffer_front, 0, DISPLAY_LENGTH * 4);
+    printf(ANSI_STR_CURSOR_HOME);
     for (int i = 0; i < DISPLAY_LENGTH; ++i)
     {
         printf(" ");
         if ((i + 1) % DISPLAY_WIDTH == 0)
         {
-            printf("| %d\n", i);
+            printf("|\n");
         }
+    }
+    for (int i = 0; i < DISPLAY_WIDTH; ++i)
+    {
+        printf("-");
     }
 }
 

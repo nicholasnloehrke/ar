@@ -32,6 +32,7 @@
 #define ANSI_STR_CLEAR            "\033[1;1H\033[2J"
 #define ANSI_STR_CURSOR_INVISIBLE "\033[?25l"
 #define ANSI_STR_CURSOR_VISIBLE   "\033[?25h"
+#define ANSI_STR_CURSOR_HOME      "\033[1;1H"
 
 
 

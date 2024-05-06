@@ -12,4 +12,6 @@ include_directories(ar
 
 add_executable(ar
     src/main.c
+    src/queue.c
+    src/snake.c
 )
