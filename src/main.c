@@ -1,15 +1,15 @@
-#include <stdio.h>
-#include <stdint.h>
-#include <fcntl.h>
-#include <termios.h>
-#include <string.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <time.h>
 #include "ansi_codes.h"
+#include <fcntl.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <termios.h>
+#include <time.h>
+#include <unistd.h>
 
-#define DISPLAY_WIDTH 120
-#define DISPLAY_HEIGHT 70
+#define DISPLAY_WIDTH 150
+#define DISPLAY_HEIGHT 50
 #define DISPLAY_LENGTH (DISPLAY_WIDTH * DISPLAY_HEIGHT)
 
 uint32_t display_buffer_back[DISPLAY_LENGTH];
@@ -20,10 +20,11 @@ uint32_t display_buffer_front[DISPLAY_LENGTH];
 #define INDEX_TO_COL(index) (((index) % DISPLAY_WIDTH) + 1)
 #define SET_PIXEL(index, mode, foreground, background, character) (display_buffer_back[(index)] = (mode) << 24 | (foreground) << 16 | (background) << 8 | (character))
 
-#define printf_at(x, y, ...) \
-    do { \
+#define printf_at(x, y, ...)                                                                               \
+    do                                                                                                     \
+    {                                                                                                      \
         printf("\033[%d;%dH", INDEX_TO_ROW(POS_TO_INDEX((x), (y))), INDEX_TO_COL(POS_TO_INDEX((x), (y)))); \
-        printf(__VA_ARGS__); \
+        printf(__VA_ARGS__);                                                                               \
     } while (0)
 
 void clear_display_buffer();
@@ -31,97 +32,144 @@ void init_display();
 void draw_frame();
 int kbhit();
 
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
+    struct termios old, new;
+    tcgetattr(0, &old);
+    new = old;
+    new.c_lflag &= ~(ICANON | ECHO);
+    tcsetattr(0, TCSANOW, &new);
+
     printf(ANSI_STR_CURSOR_INVISIBLE);
     printf(ANSI_STR_CLEAR);
     init_display();
-    
-    //int x = 0;
-    //int y = 0; 
-    //while (1)
-    //{
-    //    if (kbhit())
-    //    {
-    //        char key = getchar();
-    //        switch (key)
-    //        {
-    //        case 'a':
-    //            x -= 1;
-    //            break;
-    //        case 'd':
-    //            x += 1;
-    //            break;
-    //        case 'w':
-    //            y -= 1;
-    //            break;
-    //        case 's':
-    //            y += 1;
-    //            break;
-    //        case 'q':
-    //            goto quit;
-    //        }
-    //    }
 
-    //    if (x >= DISPLAY_WIDTH - 1)
-    //    {
-    //        x = DISPLAY_WIDTH - 1;
-    //    }
-    //    else if (x < 0)
-    //    {
-    //        x = 0;
-    //    }
-    //    if (y >= DISPLAY_HEIGHT - 1)
-    //    {
-    //        y = DISPLAY_HEIGHT - 1;
-    //    }
-    //    else if (y < 0)
-    //    {
-    //        y = 0;
-    //    }
-
-    //    clear_display_buffer();
-    //    SET_PIXEL(POS_TO_INDEX(x, y), 0, 0, 0, 'X');
-
-    //    draw_frame();
-    //    fflush(stdout);
-    //    usleep(33000);
-    //}
-
-    srand(time(NULL));
-    int x, y;
+    int x = DISPLAY_WIDTH / 2;
+    int y = DISPLAY_HEIGHT / 2;
+    int x_dir = 0;
+    int y_dir = 0;
+    unsigned long long frame_counter = 0;
     while (1)
     {
-        x = rand() % DISPLAY_WIDTH;
-        y = rand() % DISPLAY_HEIGHT;
+        if (kbhit())
+        {
+            char key = getchar();
+            switch (key)
+            {
+            case 'a':
+                x_dir = -2;
+                y_dir = 0;
+                break;
+            case 'd':
+                x_dir = 2;
+                y_dir = 0;
+                break;
+            case 'w':
+                y_dir = -1;
+                x_dir = 0;
+                break;
+            case 's':
+                y_dir = 1;
+                x_dir = 0;
+                break;
+            case 'q':
+                goto quit;
+            }
+        }
+
+        if (frame_counter % 2 == 0)
+        {
+            x += x_dir;
+            y += y_dir;
+
+            if (x >= DISPLAY_WIDTH - 1)
+            {
+                x = 0;
+            }
+            else if (x < 0)
+            {
+                x = DISPLAY_WIDTH - 1;
+            }
+            if (y >= DISPLAY_HEIGHT - 1)
+            {
+                y = 0;
+            }
+            else if (y < 0)
+            {
+                y = DISPLAY_HEIGHT - 1;
+            }
+        }
 
         clear_display_buffer();
-        SET_PIXEL(POS_TO_INDEX(x, y), 0, ANSI_NUM_FG_GREEN, ANSI_NUM_BG_WHITE, 'X');
+        SET_PIXEL(POS_TO_INDEX(x, y), 0, 0, 0, 'X');
+
+        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, '.');
+        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, 'x');
+        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, '.');
+        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, 'x');
+        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, '.');
+        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, 'x');
+        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, '.');
+        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, 'x');
+        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, '.');
+        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, 'x');
+        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, '.');
+        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, 'x');
+        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, '.');
+        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, 'x');
+        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, '.');
+        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, 'x');
+        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, '.');
+        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, 'x');
+        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, '.');
+        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, 'x');
+        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, '.');
+        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, 'x');
+        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, '.');
+        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, 'x');
+        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, '.');
+        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, 'x');
+        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, '.');
+        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, 'x');
+        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, '.');
+        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, 'x');
+        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, '.');
+        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, 'x');
+        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, '.');
+        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, 'x');
+        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, '.');
+        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, 'x');
+        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, '.');
+        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, 'x');
+        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, '.');
+        SET_PIXEL(POS_TO_INDEX(rand() % DISPLAY_WIDTH, rand() % DISPLAY_HEIGHT), 0, 0, 0, 'x');
 
         draw_frame();
-        fflush(NULL);
-        usleep(1000000);
-    }
-        
-    
+        fflush(stdout);
+        usleep(33000);
 
-    quit:
-    
+        ++frame_counter;
+    }
+
+quit:
+
     printf("\033[%d;%dH", DISPLAY_HEIGHT, DISPLAY_WIDTH);
     printf(ANSI_STR_CURSOR_VISIBLE);
-                    
+
+    tcsetattr(0, TCSANOW, &old);
+
     return 0;
 }
 
 void clear_display_buffer()
 {
-    memset(display_buffer_back, 0, DISPLAY_LENGTH);
+    memset(display_buffer_back, 0, DISPLAY_LENGTH * 4);
 }
 
 void init_display()
 {
-    memset(display_buffer_back, 0, DISPLAY_LENGTH);
-    memset(display_buffer_front, 0, DISPLAY_LENGTH);
+    memset(display_buffer_back, 0, DISPLAY_LENGTH * 4);
+    memset(display_buffer_front, 0, DISPLAY_LENGTH * 4);
     for (int i = 0; i < DISPLAY_LENGTH; ++i)
     {
         printf(" ");
@@ -136,32 +184,24 @@ void draw_frame()
 {
     for (int i = 0; i < DISPLAY_LENGTH; ++i)
     {
-        int front = display_buffer_front[i];
-        int back = display_buffer_back[i];
-        
-        if (display_buffer_front[i] != display_buffer_back[i])
-        {
-           
+        int *front = &display_buffer_front[i];
+        int *back = &display_buffer_back[i];
 
-            display_buffer_front[i] = display_buffer_back[i];
+        if (*front != *back)
+        {
+            *front = *back;
             int row = INDEX_TO_ROW(i);
             int col = INDEX_TO_COL(i);
 
             printf("\033[%d;%dH", row, col);
-            if (display_buffer_front[i] == 0)
+            if (*front == 0)
             {
-                printf("+");
-                printf_at(0, DISPLAY_HEIGHT, "DIFF | front: %u, back: %u, index: %d", front, back, i);
+                printf(" ");
             }
             else
             {
-                uint32_t px = display_buffer_front[i]; 
-                printf("\033[%u;%u;%um%c\033[0m", (px >> 24) & 0xff, (px >> 16) & 0xff, (px >> 8) & 0xff, px & 0xff);
+                printf("\033[%u;%u;%um%c\033[0m", (*front >> 24) & 0xff, (*front >> 16) & 0xff, (*front >> 8) & 0xff, *front & 0xff);
             }
-        }
-        else
-        {
-            printf_at(0, DISPLAY_HEIGHT - 1, "SAME | front: %u, back: %u, index: %d", front, back, i);
         }
     }
 }
@@ -171,7 +211,7 @@ int kbhit()
     struct termios oldt, newt;
     int ch;
     int oldf;
-    
+
     tcgetattr(STDIN_FILENO, &oldt);
     newt = oldt;
     newt.c_lflag &= ~(ICANON | ECHO);
