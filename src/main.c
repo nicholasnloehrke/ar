@@ -1,4 +1,3 @@
-#include "ansi_codes.h"
 #include "ar.h"
 #include "snake.h"
 
@@ -175,7 +174,7 @@ int main(int argc, char **argv)
     }
 
     printf("\033[%d;%dH", DISPLAY_HEIGHT, DISPLAY_WIDTH);
-    printf(ANSI_STR_CURSOR_VISIBLE);
+    printf(AR_ANSI_STR_CURSOR_VISIBLE);
 
     tcsetattr(0, TCSANOW, &old);
 
