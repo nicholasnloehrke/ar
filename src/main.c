@@ -165,8 +165,7 @@ int main(int argc, char **argv)
 
         ar_draw_frame();
         fflush(stdout);
-        // usleep(16666);
-        usleep(10000);
+        usleep(16666);
 
         clock_gettime(CLOCK_MONOTONIC, &end_time);
         double delta_time = (end_time.tv_sec - start_time.tv_sec) + (end_time.tv_nsec - start_time.tv_nsec) / 1e9;

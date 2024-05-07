@@ -90,7 +90,7 @@ int ar_index_to_col(int index)
 
 void ar_set_pixel(int index, uint8_t mode, uint8_t foreground, uint8_t background, uint8_t character)
 {
-    display_buffer_back[(index)] = (mode) << 24 | (foreground) << 16 | (background) << 8 | (character);
+    display_buffer_back[index] = mode << 24 | foreground << 16 | background << 8 | character;
 }
 
 void ar_printf_at(int x, int y, char *format, ...)
@@ -118,6 +118,7 @@ void ar_draw_frame()
             int col = ar_index_to_col(i);
 
             printf("\033[%d;%dH", row, col);
+            
             if (*front == 0)
             {
                 printf(" ");
